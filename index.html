@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>九州家族旅行 2025</title>
+  <meta name="description" content="Edna & 小姑 的九州家族旅行紀錄 — 福岡・太宰府・湯布院・熊本">
+  <meta property="og:title" content="九州家族旅行 2025">
+  <meta property="og:description" content="7天行程完整紀錄，附地圖、照片與旅遊筆記">
+  <meta property="og:type" content="website">
   <style>
     :root {
       --green: #748573;
@@ -197,6 +201,22 @@
       height: 12px;
       background: var(--gray-border);
       margin: 0 auto;
+    }
+
+    /* ── Hover states ────────────────────── */
+    .card-photo:hover .photo-placeholder {
+      color: var(--green);
+    }
+    .card-photo:hover::after {
+      content: '📷';
+      position: absolute;
+      bottom: 8px;
+      right: 10px;
+      font-size: 16px;
+      opacity: 0.7;
+    }
+    .tag:hover {
+      opacity: 0.75;
     }
 
     /* ── Desktop Layout (≥ 768px) ────────────── */
