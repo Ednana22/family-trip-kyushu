@@ -198,6 +198,40 @@
       background: var(--gray-border);
       margin: 0 auto;
     }
+
+    /* ── Desktop Layout (≥ 768px) ────────────── */
+    @media (min-width: 768px) {
+      body {
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .main-layout {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        overflow: hidden;
+        min-height: 0;
+      }
+
+      .map-container {
+        height: 100%;
+        position: sticky;
+        top: 0;
+      }
+
+      .timeline {
+        overflow-y: auto;
+        height: 100%;
+        padding: 0 24px 80px;
+      }
+
+      .day-header {
+        top: 0;
+      }
+    }
   </style>
 </head>
 <body>
