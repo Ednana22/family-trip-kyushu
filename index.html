@@ -114,7 +114,7 @@
     /* ── Day Header ──────────────────────── */
     .day-header {
       display: flex;
-      align-items: baseline;
+      align-items: center;
       gap: 8px;
       padding: 20px 0 10px;
       position: sticky;
@@ -124,10 +124,15 @@
       border-bottom: 1px solid var(--gray-border);
       margin-bottom: 12px;
     }
+    .day-dot {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
     .day-label {
       font-size: 13px;
       font-weight: 600;
-      color: var(--green);
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
@@ -252,7 +257,6 @@
       width: 14px;
       height: 14px;
       border-radius: 50%;
-      background: #748573;
       border: 2px solid #ffffff;
       box-shadow: 0 1px 4px rgba(0,0,0,0.3);
       cursor: pointer;
@@ -327,6 +331,17 @@
   </div>
 
   <script>
+    // 莫蘭迪配色：低飽和度、帶灰調、7 天各自獨立色系
+    const DAY_COLORS = {
+      1: '#C4968E',   // 珊瑚灰
+      2: '#8BA3B5',   // 霧藍
+      3: '#8EA68E',   // 苔綠
+      4: '#C2AA82',   // 麥黃
+      5: '#A697B8',   // 薰衣紫
+      6: '#B5907A',   // 陶土
+      7: '#8AAFA4',   // 薄荷
+    };
+
     const LANDMARKS = [
       // ── Day 1 · 福岡 ──────────────────────────────────────────
       {
@@ -505,6 +520,7 @@
         const el = document.createElement('div');
         el.className = 'map-pin';
         el.title = lm.name;
+        el.style.background = DAY_COLORS[lm.day] || '#748573';
 
         const popup = new maplibregl.Popup({
           offset: 18,
@@ -547,9 +563,13 @@
           const { city, items } = byDay[day];
 
           const header = document.createElement('div');
+          const color = DAY_COLORS[day] || '#748573';
           header.className = 'day-header';
           header.id = `day-${day}`;
-          header.innerHTML = `<span class="day-label">Day ${day}</span><span class="day-city">${city}</span>`;
+          header.innerHTML = `
+            <span class="day-dot" style="background:${color}"></span>
+            <span class="day-label" style="color:${color}">Day ${day}</span>
+            <span class="day-city">${city}</span>`;
           timeline.appendChild(header);
 
           items.forEach((lm, idx) => {
