@@ -500,9 +500,14 @@
       const reader = new FileReader();
       reader.onload = e => {
         const dataUrl = e.target.result;
-        localStorage.setItem(`photo-${id}`, dataUrl);
+        try {
+          localStorage.setItem(`photo-${id}`, dataUrl);
+        } catch (e) {
+          console.warn('localStorage quota exceeded — photo will not persist after reload.');
+        }
 
         const photoDiv = document.querySelector(`#card-${id} .card-photo`);
+        if (!photoDiv) return;
         photoDiv.innerHTML = `
           <img src="${dataUrl}" alt="">
           <input type="file" accept="image/*" id="file-${id}"
