@@ -8,6 +8,7 @@
   <meta property="og:title" content="九州家族旅行 2025">
   <meta property="og:description" content="7天行程完整紀錄，附地圖、照片與旅遊筆記">
   <meta property="og:type" content="website">
+  <link href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css" rel="stylesheet">
   <style>
     :root {
       --green: #748573;
@@ -202,6 +203,19 @@
       background: var(--gray-border);
       margin: 0 auto;
     }
+
+    /* ── Map Pin ─────────────────────────── */
+    .map-pin {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #748573;
+      border: 2px solid #ffffff;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+    .map-pin:hover { transform: scale(1.3); }
 
     /* ── Hover states ────────────────────── */
     .card-photo:hover .photo-placeholder {
@@ -425,43 +439,35 @@
     ];
 
     function initMap() {
-      const map = new google.maps.Map(document.getElementById('map'), {
-        center: { lat: 33.2, lng: 130.9 },
-        zoom: 8,
-        disableDefaultUI: true,
-        zoomControl: true,
-        mapTypeControl: false,
-        styles: [
-          { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-          { featureType: 'transit', elementType: 'labels', stylers: [{ visibility: 'off' }] }
-        ]
+      const map = new maplibregl.Map({
+        container: 'map',
+        style: 'https://tiles.openfreemap.org/styles/bright',
+        center: [130.9, 33.2],   // MapLibre uses [lng, lat]
+        zoom: 7
       });
       window._map = map;
-      renderPins(map);
+      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+      map.on('load', () => renderPins(map));
     }
 
     function renderPins(map) {
       LANDMARKS.forEach(lm => {
-        const marker = new google.maps.Marker({
-          position: { lat: lm.lat, lng: lm.lng },
-          map,
-          title: lm.name,
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 8,
-            fillColor: '#748573',
-            fillOpacity: 1,
-            strokeColor: '#ffffff',
-            strokeWeight: 2
-          }
-        });
+        const el = document.createElement('div');
+        el.className = 'map-pin';
+        el.title = lm.name;
 
-        const infoWindow = new google.maps.InfoWindow({
-          content: `<div style="font-family:-apple-system,sans-serif;font-size:13px;font-weight:500;padding:2px 4px">${lm.name}</div>`
-        });
+        const popup = new maplibregl.Popup({
+          offset: 18,
+          closeButton: false,
+          className: 'map-popup'
+        }).setHTML(`<div style="font-family:-apple-system,sans-serif;font-size:13px;font-weight:500;padding:2px 4px">${lm.name}</div>`);
 
-        marker.addListener('click', () => {
-          infoWindow.open(map, marker);
+        new maplibregl.Marker({ element: el })
+          .setLngLat([lm.lng, lm.lat])
+          .setPopup(popup)
+          .addTo(map);
+
+        el.addEventListener('click', () => {
           const card = document.getElementById(`card-${lm.id}`);
           if (card) {
             card.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -569,14 +575,13 @@
       reader.readAsDataURL(file);
     }
 
-    document.addEventListener('DOMContentLoaded', renderTimeline);
+    document.addEventListener('DOMContentLoaded', () => {
+      renderTimeline();
+      initMap();
+    });
   </script>
 
-  <!-- Replace YOUR_API_KEY with your Google Maps API key -->
-  <script
-    src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap"
-    async defer>
-  </script>
+  <script src="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js"></script>
 
 </body>
 </html>
