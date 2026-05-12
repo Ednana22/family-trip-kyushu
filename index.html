@@ -677,33 +677,19 @@
       input.value = '';   // 允許重複上傳同一檔案
     }
 
-    function applyTripData(data) {
-      // 驗證最低結構
-      if (!data.days || !Array.isArray(data.days)) {
-        showToast('❌ 缺少 "days" 欄位');
-        return;
-      }
-
-      // 更新頁面標題
-      if (data.title) {
-        document.getElementById('nav-title').textContent = data.title;
-        document.title = data.title;
-      }
-
-      // 將巢狀結構攤平為 LANDMARKS 陣列
-      const newLandmarks = [];
-      for (const d of data.days) {
+    // 將 days 陣列攤平為 LANDMARKS 格式（共用邏輯）
+    function flattenDays(days) {
+      const result = [];
+      for (const d of days) {
         if (!d.day || !d.city || !Array.isArray(d.landmarks)) continue;
         d.landmarks.forEach((lm, idx) => {
           if (!lm.name || lm.lat == null || lm.lng == null) return;
-          // 自動產生 ID（day1-0, day1-1, ...）
-          const id = `day${d.day}-${idx}`;
-          newLandmarks.push({
-            id,
+          result.push({
+            id:    `day${d.day}-${idx}`,
             day:   d.day,
             city:  d.city,
             name:  lm.name,
-            hours: lm.hours  || '',
+            hours: lm.hours || '',
             tags:  Array.isArray(lm.tags)  ? lm.tags  : [],
             notes: Array.isArray(lm.notes) ? lm.notes : [],
             lat:   lm.lat,
@@ -711,29 +697,36 @@
           });
         });
       }
+      return result;
+    }
 
+    // 手動匯入（有 toast 回饋、地圖重繪）
+    function applyTripData(data) {
+      if (!data.days || !Array.isArray(data.days)) {
+        showToast('❌ 缺少 "days" 欄位');
+        return;
+      }
+
+      if (data.title) {
+        document.getElementById('nav-title').textContent = data.title;
+        document.title = data.title;
+      }
+
+      const newLandmarks = flattenDays(data.days);
       if (newLandmarks.length === 0) {
         showToast('❌ 沒有找到有效地標（請確認 lat / lng / name）');
         return;
       }
 
-      // 套用新資料
       LANDMARKS.length = 0;
       newLandmarks.forEach(lm => LANDMARKS.push(lm));
 
-      // 重新渲染時間軸
       renderTimeline();
 
-      // 重新渲染地圖圖釘
       if (window._map) {
-        // 移除舊 marker
         (window._markers || []).forEach(m => m.remove());
         window._markers = [];
         renderPins(window._map);
-      }
-
-      // 地圖視角飛到第一個地標
-      if (window._map && newLandmarks.length > 0) {
         const first = newLandmarks[0];
         window._map.flyTo({ center: [first.lng, first.lat], zoom: 8, duration: 1200 });
       }
@@ -748,7 +741,26 @@
       setTimeout(() => el.classList.remove('show'), 3000);
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
+    // 頁面載入時自動讀取 trip-template.json
+    // fetch 成功 → 套用資料再初始化（map 和 timeline 直接用新資料）
+    // fetch 失敗（file:// 或檔案不存在）→ 靜默 fallback，使用內建資料
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const res = await fetch('trip-template.json');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.title) {
+            document.getElementById('nav-title').textContent = data.title;
+            document.title = data.title;
+          }
+          const flat = flattenDays(data.days || []);
+          if (flat.length > 0) {
+            LANDMARKS.length = 0;
+            flat.forEach(lm => LANDMARKS.push(lm));
+          }
+        }
+      } catch (_) {}   // file:// 或網路錯誤 → 繼續用內建資料
+
       renderTimeline();
       initMap();
     });
