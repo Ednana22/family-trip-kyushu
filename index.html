@@ -38,11 +38,53 @@
       background: var(--white);
       border-bottom: 1px solid var(--gray-border);
       padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
     .nav-title {
       font-size: 15px;
       font-weight: 600;
       letter-spacing: 0.01em;
+    }
+    .nav-import-btn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--green);
+      border: 0.5px solid var(--green);
+      border-radius: 20px;
+      padding: 4px 10px;
+      cursor: pointer;
+      background: none;
+      white-space: nowrap;
+      transition: background 0.15s, color 0.15s;
+    }
+    .nav-import-btn:hover {
+      background: var(--green);
+      color: var(--white);
+    }
+    .import-toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #1a1a1a;
+      color: #fff;
+      font-size: 13px;
+      padding: 10px 18px;
+      border-radius: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s, transform 0.3s;
+      z-index: 999;
+      white-space: nowrap;
+    }
+    .import-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
     }
 
     /* ── Layout ──────────────────────────── */
@@ -269,8 +311,14 @@
 <body>
 
   <nav class="nav">
-    <span class="nav-title">九州家族旅行 2025</span>
+    <span class="nav-title" id="nav-title">九州家族旅行 2025</span>
+    <button class="nav-import-btn" onclick="document.getElementById('json-upload').click()">
+      ＋ 匯入行程
+    </button>
+    <input type="file" id="json-upload" accept=".json,application/json"
+           style="display:none" onchange="handleJsonUpload(this)">
   </nav>
+  <div class="import-toast" id="import-toast"></div>
 
   <div class="main-layout">
     <div id="map" class="map-container"></div>
@@ -451,6 +499,7 @@
     }
 
     function renderPins(map) {
+      if (!window._markers) window._markers = [];
       LANDMARKS.forEach(lm => {
         const el = document.createElement('div');
         el.className = 'map-pin';
@@ -462,10 +511,12 @@
           className: 'map-popup'
         }).setHTML(`<div style="font-family:-apple-system,sans-serif;font-size:13px;font-weight:500;padding:2px 4px">${lm.name}</div>`);
 
-        new maplibregl.Marker({ element: el })
+        const marker = new maplibregl.Marker({ element: el })
           .setLngLat([lm.lng, lm.lat])
           .setPopup(popup)
           .addTo(map);
+
+        window._markers.push(marker);
 
         el.addEventListener('click', () => {
           const card = document.getElementById(`card-${lm.id}`);
@@ -573,6 +624,127 @@
                  onchange="handlePhoto('${id}', this)">`;
       };
       reader.readAsDataURL(file);
+    }
+
+    /* ──────────────────────────────────────
+       JSON 匯入 / 解析 / 套用
+    ────────────────────────────────────── */
+
+    /**
+     * 期望的 JSON 格式：
+     * {
+     *   "title": "九州家族旅行 2025",          // 選填：網頁標題
+     *   "authors": [                           // 選填：筆記作者
+     *     { "initial": "E", "name": "Edna" },
+     *     { "initial": "S", "name": "小姑" }
+     *   ],
+     *   "days": [                              // 必填：天數陣列
+     *     {
+     *       "day": 1,                          // 必填：第幾天（數字）
+     *       "city": "福岡",                    // 必填：城市名稱
+     *       "landmarks": [                     // 必填：地標陣列
+     *         {
+     *           "name": "博多駅",              // 必填：地標名稱
+     *           "hours": "全天開放",           // 選填：營業時間
+     *           "tags": ["推薦", "必買"],       // 選填：標籤（推薦會顯示綠色）
+     *           "lat": 33.5898,               // 必填：緯度
+     *           "lng": 130.4205,              // 必填：經度
+     *           "notes": [                    // 選填：旅遊筆記
+     *             { "author": "E", "text": "筆記內容" },
+     *             { "author": "S", "text": "筆記內容" }
+     *           ]
+     *         }
+     *       ]
+     *     }
+     *   ]
+     * }
+     */
+
+    function handleJsonUpload(input) {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const data = JSON.parse(e.target.result);
+          applyTripData(data);
+        } catch (err) {
+          showToast('❌ JSON 格式錯誤，請確認檔案內容');
+        }
+      };
+      reader.readAsText(file);
+      input.value = '';   // 允許重複上傳同一檔案
+    }
+
+    function applyTripData(data) {
+      // 驗證最低結構
+      if (!data.days || !Array.isArray(data.days)) {
+        showToast('❌ 缺少 "days" 欄位');
+        return;
+      }
+
+      // 更新頁面標題
+      if (data.title) {
+        document.getElementById('nav-title').textContent = data.title;
+        document.title = data.title;
+      }
+
+      // 將巢狀結構攤平為 LANDMARKS 陣列
+      const newLandmarks = [];
+      for (const d of data.days) {
+        if (!d.day || !d.city || !Array.isArray(d.landmarks)) continue;
+        d.landmarks.forEach((lm, idx) => {
+          if (!lm.name || lm.lat == null || lm.lng == null) return;
+          // 自動產生 ID（day1-0, day1-1, ...）
+          const id = `day${d.day}-${idx}`;
+          newLandmarks.push({
+            id,
+            day:   d.day,
+            city:  d.city,
+            name:  lm.name,
+            hours: lm.hours  || '',
+            tags:  Array.isArray(lm.tags)  ? lm.tags  : [],
+            notes: Array.isArray(lm.notes) ? lm.notes : [],
+            lat:   lm.lat,
+            lng:   lm.lng
+          });
+        });
+      }
+
+      if (newLandmarks.length === 0) {
+        showToast('❌ 沒有找到有效地標（請確認 lat / lng / name）');
+        return;
+      }
+
+      // 套用新資料
+      LANDMARKS.length = 0;
+      newLandmarks.forEach(lm => LANDMARKS.push(lm));
+
+      // 重新渲染時間軸
+      renderTimeline();
+
+      // 重新渲染地圖圖釘
+      if (window._map) {
+        // 移除舊 marker
+        (window._markers || []).forEach(m => m.remove());
+        window._markers = [];
+        renderPins(window._map);
+      }
+
+      // 地圖視角飛到第一個地標
+      if (window._map && newLandmarks.length > 0) {
+        const first = newLandmarks[0];
+        window._map.flyTo({ center: [first.lng, first.lat], zoom: 8, duration: 1200 });
+      }
+
+      showToast(`✅ 已載入 ${newLandmarks.length} 個地標`);
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById('import-toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 3000);
     }
 
     document.addEventListener('DOMContentLoaded', () => {
