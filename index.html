@@ -490,6 +490,28 @@
       return card;
     }
 
+    function triggerUpload(id) {
+      document.getElementById(`file-${id}`).click();
+    }
+
+    function handlePhoto(id, input) {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const dataUrl = e.target.result;
+        localStorage.setItem(`photo-${id}`, dataUrl);
+
+        const photoDiv = document.querySelector(`#card-${id} .card-photo`);
+        photoDiv.innerHTML = `
+          <img src="${dataUrl}" alt="">
+          <input type="file" accept="image/*" id="file-${id}"
+                 style="display:none"
+                 onchange="handlePhoto('${id}', this)">`;
+      };
+      reader.readAsDataURL(file);
+    }
+
     document.addEventListener('DOMContentLoaded', renderTimeline);
   </script>
 
