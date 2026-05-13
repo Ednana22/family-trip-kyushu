@@ -19,6 +19,8 @@
       --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
       --card-radius: 12px;
       --card-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      --nav-h: 49px;
+      --map-h: 40vh;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -28,6 +30,10 @@
       background: var(--white);
       color: #1a1a1a;
       -webkit-font-smoothing: antialiased;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
 
     /* ── Nav ─────────────────────────────── */
@@ -89,19 +95,25 @@
 
     /* ── Layout ──────────────────────────── */
     .main-layout {
+      flex: 1;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
+      min-height: 0;
     }
 
-    /* ── Map ─────────────────────────────── */
+    /* ── Map (mobile: fixed 40vh, does not scroll) ── */
     .map-container {
-      height: 40vh;
+      flex: 0 0 var(--map-h);
       width: 100%;
       background: var(--gray-bg);
     }
 
-    /* ── Timeline (mobile) ───────────────── */
+    /* ── Timeline (mobile: scroll only this area) ─── */
     .timeline {
+      flex: 1;
+      overflow-y: auto;
+      min-height: 0;
       padding: 0 16px 80px;
     }
 
@@ -118,7 +130,7 @@
       gap: 8px;
       padding: 20px 0 10px;
       position: sticky;
-      top: 49px;
+      top: 0;
       background: var(--white);
       z-index: 100;
       border-bottom: 1px solid var(--gray-border);
@@ -282,33 +294,18 @@
 
     /* ── Desktop Layout (≥ 768px) ────────────── */
     @media (min-width: 768px) {
-      body {
-        height: 100vh;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-      }
-
       .main-layout {
-        flex: 1;
         display: grid;
         grid-template-columns: 1fr 1fr;
-        overflow: hidden;
-        min-height: 0;
       }
 
       .map-container {
+        flex: none;
         height: 100%;
       }
 
       .timeline {
-        overflow-y: auto;
-        height: 100%;
         padding: 0 24px 80px;
-      }
-
-      .day-header {
-        top: 0;
       }
     }
   </style>
@@ -534,6 +531,8 @@
           .addTo(map);
 
         window._markers.push(marker);
+        if (!window._markerMap) window._markerMap = {};
+        window._markerMap[lm.id] = marker;
 
         el.addEventListener('click', () => {
           const card = document.getElementById(`card-${lm.id}`);
@@ -544,6 +543,19 @@
           }
         });
       });
+    }
+
+    function showMarkerPopup(id, lng, lat) {
+      const marker = (window._markerMap || {})[id];
+      if (!marker) return;
+      // 關閉所有已開啟的 popup
+      (window._markers || []).forEach(m => {
+        if (m.getPopup && m.getPopup().isOpen()) m.togglePopup();
+      });
+      // 開啟目標 popup
+      if (marker.getPopup && !marker.getPopup().isOpen()) marker.togglePopup();
+      // 飛到該地標
+      if (window._map) window._map.flyTo({ center: [lng, lat], zoom: 15, duration: 800 });
     }
 
     function renderTimeline() {
@@ -591,7 +603,9 @@
       const savedPhoto = localStorage.getItem(`photo-${lm.id}`);
       const photoContent = savedPhoto
         ? `<img src="${savedPhoto}" alt="${lm.name}">`
-        : `<span class="photo-placeholder">點擊上傳照片</span>`;
+        : lm.cover
+          ? `<img src="${lm.cover}" alt="${lm.name}">`
+          : `<span class="photo-placeholder">點擊上傳照片</span>`;
 
       const tagsHTML = lm.tags.map(t =>
         `<span class="tag ${t === '推薦' ? 'tag-green' : ''}">${t}</span>`
@@ -617,6 +631,12 @@
           <div class="card-tags">${tagsHTML}</div>
           <div class="card-notes">${notesHTML}</div>
         </div>`;
+
+      card.addEventListener('click', e => {
+        if (e.target.closest('.card-photo')) return;
+        showMarkerPopup(lm.id, lm.lng, lm.lat);
+      });
+
       return card;
     }
 
@@ -713,7 +733,8 @@
             tags:  Array.isArray(lm.tags)  ? lm.tags  : [],
             notes: Array.isArray(lm.notes) ? lm.notes : [],
             lat:   lm.lat,
-            lng:   lm.lng
+            lng:   lm.lng,
+            cover: lm.cover || null
           });
         });
       }
@@ -746,6 +767,7 @@
       if (window._map) {
         (window._markers || []).forEach(m => m.remove());
         window._markers = [];
+        window._markerMap = {};
         renderPins(window._map);
         const first = newLandmarks[0];
         window._map.flyTo({ center: [first.lng, first.lat], zoom: 8, duration: 1200 });
